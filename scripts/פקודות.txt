@@ -10,29 +10,6 @@ oc rollout status deploy/mongodb -n 0533orel-dev
 oc apply -f api-mongo.yaml -n 0533orel-dev
 oc rollout status deploy/data-loader-api -n 0533orel-dev
 
-# 4) URL חיצוני
-oc get route data-loader-api -n 0533orel-dev
-# ואז: https://<route>/health  ו-  https://<route>/data
-
-
-# כניסה לפוד של MongoDB
-oc rsh -n 0533orel-dev deploy/mongodb
-
-# בתוך הפוד:
-cat >/tmp/seed.js <<'JS'
-db = db.getSiblingDB("appdb");
-db.people.insertMany([
-  { first_name: "David", last_name: "Cohen" },
-  { first_name: "Ariel", last_name: "Levy"  },
-  { first_name: "Inon",  last_name: "Mizrahi"},
-  { first_name: "Eyal",  last_name: "Peretz"},
-  { first_name: "Moshe", last_name: "Biton" }
-]);
-JS
-
-/opt/bitnami/mongodb/bin/mongosh --eval 'db.adminCommand({ ping: 1 })'
-/opt/bitnami/mongodb/bin/mongosh /tmp/seed.js
-
 
 ואז בבאש
 
