@@ -1,0 +1,114 @@
+# ========== Secret: סיסמאות ל-MongoDB ==========
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mongodb-secret
+  namespace: 0533orel-dev
+type: Opaque
+stringData:
+  # משתמש root לניהול (אופציונלי אבל מומלץ להגדיר)
+  MONGODB_ROOT_PASSWORD: "RootP@ss123"
+  # משתמש אפליקטיבי (יקבל הרשאות readWrite על הדאטהבייס שלמטה)
+  MONGODB_USERNAME: "appuser"
+  MONGODB_PASSWORD: "apppass"
+  MONGODB_DATABASE: "appdb"
+---
+# ========== PVC: אחסון מתמשך ל-MongoDB ==========
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mongodb-pvc
+  namespace: 0533orel-dev
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 1Gi
+---
+# ========== Deployment: MongoDB (תואם OpenShift, non-root) ==========
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mongodb
+  namespace: 0533orel-dev
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongodb
+  strategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: mongodb
+    spec:
+      containers:
+        - name: mongodb
+          image: bitnami/mongodb:7.0        # תומך ב-arbitrary UID
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: mongo
+              containerPort: 27017
+              protocol: TCP
+          envFrom:
+            - secretRef:
+                name: mongodb-secret
+          env:
+            - name: ALLOW_EMPTY_PASSWORD
+              value: "no"
+            # אופציונלי: נטרול telemetry
+            - name: BITNAMI_DEBUG
+              value: "false"
+          volumeMounts:
+            - name: data
+              mountPath: /bitnami/mongodb
+          readinessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -ec
+                - >
+                  /opt/bitnami/mongodb/bin/mongosh --quiet --eval "db.adminCommand({ ping: 1 })"
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 6
+          livenessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -ec
+                - >
+                  /opt/bitnami/mongodb/bin/mongosh --quiet --eval "db.adminCommand({ ping: 1 })"
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: mongodb-pvc
+---
+# ========== Service: חשיפת MongoDB בתוך הקלאסטר ==========
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb
+  namespace: 0533orel-dev
+spec:
+  selector:
+    app: mongodb
+  ports:
+    - name: mongo
+      port: 27017
+      targetPort: 27017
+      protocol: TCP
+  type: ClusterIP

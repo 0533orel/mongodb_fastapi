@@ -1,0 +1,64 @@
+# 1) בניית אימג' והעלאה (עדכן שם/טאג)
+docker build -t 0533orel/data-loader-api:mongodb .
+docker push 0533orel/data-loader-api:mongodb
+
+# 2) פריסת MongoDB (כבר יש לך; אם לא - הרץ את mongo.yaml מההודעה הקודמת)
+oc apply -f mongo.yaml -n 0533orel-dev
+oc rollout status deploy/mongodb -n 0533orel-dev
+
+# 3) פריסת ה-API
+oc apply -f api-mongo.yaml -n 0533orel-dev
+oc rollout status deploy/data-loader-api -n 0533orel-dev
+
+# 4) URL חיצוני
+oc get route data-loader-api -n 0533orel-dev
+# ואז: https://<route>/health  ו-  https://<route>/data
+
+
+# כניסה לפוד של MongoDB
+oc rsh -n 0533orel-dev deploy/mongodb
+
+# בתוך הפוד:
+cat >/tmp/seed.js <<'JS'
+db = db.getSiblingDB("appdb");
+db.people.insertMany([
+  { first_name: "David", last_name: "Cohen" },
+  { first_name: "Ariel", last_name: "Levy"  },
+  { first_name: "Inon",  last_name: "Mizrahi"},
+  { first_name: "Eyal",  last_name: "Peretz"},
+  { first_name: "Moshe", last_name: "Biton" }
+]);
+JS
+
+/opt/bitnami/mongodb/bin/mongosh --eval 'db.adminCommand({ ping: 1 })'
+/opt/bitnami/mongodb/bin/mongosh /tmp/seed.js
+
+
+ואז בבאש
+
+oc exec -n 0533orel-dev deploy/mongodb -- bash -lc '
+/opt/bitnami/mongodb/bin/mongosh "mongodb://${MONGODB_USERNAME}:${MONGODB_PASSWORD}@127.0.0.1:27017/${MONGODB_DATABASE}?authSource=${MONGODB_DATABASE}" --quiet <<EOF
+db = db.getSiblingDB("${MONGODB_DATABASE}");
+db.data.insertMany([
+  { first_name: "David", last_name: "Cohen" },
+  { first_name: "Ariel", last_name: "Levy"  },
+  { first_name: "Inon",  last_name: "Mizrahi"},
+  { first_name: "Eyal",  last_name: "Peretz"},
+  { first_name: "Moshe", last_name: "Biton" }
+]);
+printjson(db.data.countDocuments());
+EOF
+'
+
+oc exec -n 0533orel-dev deploy/mongodb -- bash -lc '
+/opt/bitnami/mongodb/bin/mongosh "mongodb://${MONGODB_USERNAME}:${MONGODB_PASSWORD}@127.0.0.1:27017/${MONGODB_DATABASE}?authSource=${MONGODB_DATABASE}" --quiet --eval "db.data.find().limit(5).toArray()"
+'
+
+oc set env deploy/data-loader-api MONGO_COLLECTION=data -n 0533orel-dev
+oc rollout restart deploy/data-loader-api -n 0533orel-dev
+
+
+oc get route data-loader-api -n 0533orel-dev -o jsonpath="{.spec.host}{'\n'}"
+
+
+
