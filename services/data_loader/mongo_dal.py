@@ -3,18 +3,9 @@ import os
 from typing import List, Dict, Any
 from motor.motor_asyncio import AsyncIOMotorClient
 
-MONGO_HOST = os.getenv("MONGO_HOST", "mongodb")
-MONGO_PORT = int(os.getenv("MONGO_PORT", "27017"))
-MONGO_DB   = os.getenv("MONGO_DB", "appdb")
-MONGO_USER = os.getenv("MONGO_USER", "appuser")
-MONGO_PASS = os.getenv("MONGO_PASS", "apppass")
-MONGO_AUTH_SOURCE = os.getenv("MONGO_AUTH_SOURCE", MONGO_DB)
+from .config import mongo_uri
 
-# ניתן גם לספק MONGO_URI ישיר; אם לא, נבנה ממרכיבים
-MONGO_URI  = os.getenv(
-    "MONGO_URI",
-    f"mongodb://{MONGO_USER}:{MONGO_PASS}@{MONGO_HOST}:{MONGO_PORT}/{MONGO_DB}?authSource={MONGO_AUTH_SOURCE}"
-)
+MONGO_DB = os.getenv("MONGO_DB", "appdb")
 
 COLLECTION = os.getenv("MONGO_COLLECTION", "people")
 
@@ -23,7 +14,7 @@ _client: AsyncIOMotorClient | None = None
 def get_client() -> AsyncIOMotorClient:
     global _client
     if _client is None:
-        _client = AsyncIOMotorClient(MONGO_URI)
+        _client = AsyncIOMotorClient(mongo_uri())
     return _client
 
 def get_collection():
