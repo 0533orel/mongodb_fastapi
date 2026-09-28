@@ -1,18 +1,4 @@
-# ========== Secret: סיסמאות ל-MongoDB ==========
-apiVersion: v1
-kind: Secret
-metadata:
-  name: mongodb-secret
-  namespace: 0533orel-dev
-type: Opaque
-stringData:
-  # משתמש root לניהול (אופציונלי אבל מומלץ להגדיר)
-  MONGODB_ROOT_PASSWORD: "RootP@ss123"
-  # משתמש אפליקטיבי (יקבל הרשאות readWrite על הדאטהבייס שלמטה)
-  MONGODB_USERNAME: "appuser"
-  MONGODB_PASSWORD: "apppass"
-  MONGODB_DATABASE: "appdb"
----
+# Create mongodb-secret separately; see SECURITY.md.
 # ========== PVC: אחסון מתמשך ל-MongoDB ==========
 apiVersion: v1
 kind: PersistentVolumeClaim
